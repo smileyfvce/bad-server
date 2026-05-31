@@ -28,7 +28,7 @@ const limiter = rateLimit({
 app.use(limiter)
 
 app.use(cookieParser())
-app.use(cors({ origin: process.env.ORIGIN_ALLOW, credentials: true }));
+app.use(cors({ origin: process.env.ORIGIN_ALLOW, credentials: true }))
 // app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(serveStatic(path.join(__dirname, 'public')))

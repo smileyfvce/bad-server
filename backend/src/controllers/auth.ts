@@ -211,6 +211,11 @@ const updateCurrentUser = async (
     }
 }
 
+export const getCsrfToken = (req: Request, res: Response) => {
+    res.json({ csrfToken: req.csrfToken()})
+}
+
+
 export {
     getCurrentUser,
     getCurrentUserRoles,
