@@ -1,4 +1,4 @@
-import csrf from 'csurf'
+import csrf from '@dr.pogodin/csurf'
 import { Router } from 'express'
 import { uploadFile } from '../controllers/upload'
 import fileMiddleware from '../middlewares/file'
