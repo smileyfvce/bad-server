@@ -3,6 +3,8 @@ import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
+import BadRequestError from '../errors/bad-request-error'
+import escapeRegExp from '../utils/escapeRegExp'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -28,6 +30,8 @@ export const getCustomers = async (
             orderCountTo,
             search,
         } = req.query
+        
+        const safeLimit = Math.min(Number(limit), 10)
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
@@ -91,8 +95,12 @@ export const getCustomers = async (
             }
         }
 
-        if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+        if (search && typeof search === 'string') {
+            if (search.length > 200) {
+                return next(new BadRequestError('Слишком длинный запрос'))
+            }
+            const escRegExp = escapeRegExp(search)
+            const searchRegex = new RegExp(escRegExp, 'i')
             const orders = await Order.find(
                 {
                     $or: [{ deliveryAddress: searchRegex }],
@@ -116,8 +124,8 @@ export const getCustomers = async (
 
         const options = {
             sort,
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(page) - 1) * Number(safeLimit),
+            limit: Number(safeLimit),
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -145,7 +153,7 @@ export const getCustomers = async (
                 totalUsers,
                 totalPages,
                 currentPage: Number(page),
-                pageSize: Number(limit),
+                pageSize: safeLimit,
             },
         })
     } catch (error) {
@@ -179,9 +187,16 @@ export const updateCustomer = async (
     next: NextFunction
 ) => {
     try {
+        const updateFields = ['name', 'email']
+        const updates: any = {}
+        updateFields.forEach((key) => {
+            if (req.body[key] !== undefined) {
+                updates[key] = String(req.body[key])
+            }
+        })
         const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            updates,
             {
                 new: true,
             }
