@@ -30,6 +30,8 @@ export const getCustomers = async (
             orderCountTo,
             search,
         } = req.query
+        
+        const safeLimit = Math.min(Number(limit), 10)
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
@@ -122,8 +124,8 @@ export const getCustomers = async (
 
         const options = {
             sort,
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(page) - 1) * Number(safeLimit),
+            limit: Number(safeLimit),
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -151,7 +153,7 @@ export const getCustomers = async (
                 totalUsers,
                 totalPages,
                 currentPage: Number(page),
-                pageSize: Number(limit),
+                pageSize: safeLimit,
             },
         })
     } catch (error) {
