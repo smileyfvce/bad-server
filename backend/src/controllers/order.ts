@@ -6,9 +6,20 @@ import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
 import escapeRegExp from '../utils/escapeRegExp'
+import { phoneRegExp } from 'middlewares/validations'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
+
+function escapeHtml(text: string): string {
+    if (!text) return ''
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+}
 
 export const getOrders = async (
     req: Request,
@@ -29,15 +40,14 @@ export const getOrders = async (
             search,
         } = req.query
 
+        const safeLimit = Math.min(Number(limit), 10)
         const filters: FilterQuery<Partial<IOrder>> = {}
 
         if (status) {
             if (typeof status === 'object') {
-                Object.assign(filters, status)
+                return next(new BadRequestError('Неправильный формат'))
             }
-            if (typeof status === 'string') {
-                filters.status = status
-            }
+            filters.status = String(status)
         }
 
         if (totalAmountFrom) {
@@ -121,8 +131,8 @@ export const getOrders = async (
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (Number(page) - 1) * safeLimit },
+            { $limit: safeLimit },
             {
                 $group: {
                     _id: '$_id',
@@ -138,7 +148,7 @@ export const getOrders = async (
 
         const orders = await Order.aggregate(aggregatePipeline)
         const totalOrders = await Order.countDocuments(filters)
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / safeLimit)
 
         res.status(200).json({
             orders,
@@ -146,7 +156,7 @@ export const getOrders = async (
                 totalOrders,
                 totalPages,
                 currentPage: Number(page),
-                pageSize: Number(limit),
+                pageSize: safeLimit,
             },
         })
     } catch (error) {
@@ -302,6 +312,10 @@ export const createOrder = async (
         const { address, payment, phone, total, email, items, comment } =
             req.body
 
+        if(!phoneRegExp.test(phone)){
+            throw new BadRequestError('Неверный формат телефона')
+        }
+
         items.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
             if (!product) {
@@ -323,7 +337,7 @@ export const createOrder = async (
             payment,
             phone,
             email,
-            comment,
+            comment: escapeHtml(comment),
             customer: userId,
             deliveryAddress: address,
         })
