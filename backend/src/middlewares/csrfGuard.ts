@@ -16,7 +16,7 @@ export function sendCsrfToken(_req: Request, res: Response) {
     const token = generateCsrfToken()
     
     // Сохраняем токен в cookie (httpOnly для безопасности)
-    res.cookie('csrf-token', token, {
+    res.cookie('_csrf', token, {
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
