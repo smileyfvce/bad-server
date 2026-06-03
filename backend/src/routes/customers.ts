@@ -5,10 +5,12 @@ import {
     getCustomers,
     updateCustomer,
 } from '../controllers/customers'
-import auth from '../middlewares/auth'
+import auth, { roleGuardMiddleware } from '../middlewares/auth'
+import { Role } from '../models/user'
 
 const customerRouter = Router()
 
+customerRouter.use(auth, roleGuardMiddleware(Role.Admin))
 customerRouter.get('/', auth, getCustomers)
 customerRouter.get('/:id', auth, getCustomerById)
 customerRouter.patch('/:id', auth, updateCustomer)
