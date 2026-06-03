@@ -3,7 +3,6 @@ import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
-import escapeRegExp from '../utils/escapeRegExp'
 import { normalizeLimit } from '../utils/normalizeLimit'
 
 // TODO: Добавить guard admin
@@ -99,8 +98,7 @@ export const getCustomers = async (
         }
 
         if (typeof search === 'string' && search) {
-            const safeSearch = escapeRegExp(search)
-            const searchRegex = new RegExp(safeSearch, 'i')
+            const searchRegex = new RegExp(search, 'i')
             const orders = await Order.find(
                 { deliveryAddress: searchRegex },
                 '_id'
