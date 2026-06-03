@@ -7,7 +7,7 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import Product from '../models/product'
 import movingFile from '../utils/movingFile'
-import { normalizeLimit } from '../middlewares/normalizeLimit'
+import { normalizeLimit } from '../utils/normalizeLimit'
 
 // GET /product
 const getProducts = async (req: Request, res: Response, next: NextFunction) => {
