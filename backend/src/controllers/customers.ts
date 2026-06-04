@@ -100,10 +100,8 @@ export const getCustomers = async (
         if (typeof search === 'string' && search) {
             let searchRegex: RegExp
             try {
-                // Пробуем создать RegExp напрямую
                 searchRegex = new RegExp(search, 'i')
-            } catch (e) {
-                // Если ошибка (например, "+" без повторения), экранируем спецсимволы
+            } catch {
                 const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
                 searchRegex = new RegExp(escaped, 'i')
             }
