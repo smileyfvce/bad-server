@@ -3,6 +3,8 @@
 		/* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
 		"target": "es6",
 		/* Modules */
+		"ignoreDeprecations": "6.0",
+		"rootDir": "./src",
 		"module": "commonjs" /* Specify what module code is generated. */,
 		"baseUrl": "./src",
 		"moduleResolution": "node" /* Specify how TypeScript looks up a file from a given module specifier. */,
