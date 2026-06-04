@@ -11,6 +11,7 @@ import {
     updateCurrentUser,
 } from '../controllers/auth'
 import auth from '../middlewares/auth'
+import { sendCsrfToken } from '../middlewares/csrfGuard'
 
 const authRouter = Router()
 const csrfProtection = csrf({ cookie: true })

@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery, Error as MongooseError, Types } from 'mongoose'
+import sanitizeHtml from 'sanitize-html'
 import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
-import Order, { IOrder } from '../models/order'
+import Order, { IOrder, StatusType } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
 import escapeRegExp from '../utils/escapeRegExp'
@@ -27,6 +28,10 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        validateQuery(req.query, [
+    'page', 'limit', 'sortField', 'sortOrder', 'status',
+    'totalAmountFrom', 'totalAmountTo', 'orderDateFrom', 'orderDateTo', 'search'
+]);
         const {
             page = 1,
             limit = 10,
@@ -119,12 +124,9 @@ export const getOrders = async (
                     $or: searchConditions,
                 },
             })
-
-            filters.$or = searchConditions
         }
 
         const sort: { [key: string]: any } = {}
-
         if (sortField && sortOrder) {
             sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
         }
@@ -172,22 +174,15 @@ export const getOrdersCurrentUser = async (
     try {
         const userId = res.locals.user._id
         const { search, page = 1, limit = 5 } = req.query
-        const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
-        }
+
+        const safeLimit = normalizeLimit(limit, 5)
+        const safePage = Math.max(1, Number(page) || 1)
+        const skip = (safePage - 1) * safeLimit
 
         const user = await User.findById(userId)
             .populate({
                 path: 'orders',
-                populate: [
-                    {
-                        path: 'products',
-                    },
-                    {
-                        path: 'customer',
-                    },
-                ],
+                populate: [{ path: 'products' }, { path: 'customer' }],
             })
             .orFail(
                 () =>
@@ -209,31 +204,27 @@ export const getOrdersCurrentUser = async (
             const productIds = products.map((product) => product._id)
 
             orders = orders.filter((order) => {
-                // eslint-disable-next-line max-len
                 const matchesProductTitle = order.products.some((product) =>
                     productIds.some((id) => id.equals(product._id))
                 )
-                // eslint-disable-next-line max-len
                 const matchesOrderNumber =
                     !Number.isNaN(searchNumber) &&
                     order.orderNumber === searchNumber
-
                 return matchesOrderNumber || matchesProductTitle
             })
         }
 
         const totalOrders = orders.length
-        const totalPages = Math.ceil(totalOrders / Number(limit))
-
-        orders = orders.slice(options.skip, options.skip + options.limit)
+        const totalPages = Math.ceil(totalOrders / safeLimit)
+        const paginatedOrders = orders.slice(skip, skip + safeLimit)
 
         return res.send({
-            orders,
+            orders: paginatedOrders,
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: safePage,
+                pageSize: safeLimit,
             },
         })
     } catch (error) {
@@ -241,7 +232,7 @@ export const getOrdersCurrentUser = async (
     }
 }
 
-// Get order by ID
+// Get order by number (admin only)
 export const getOrderByNumber = async (
     req: Request,
     res: Response,
@@ -285,7 +276,6 @@ export const getOrderCurrentUserByNumber = async (
                     )
             )
         if (!order.customer._id.equals(userId)) {
-            // Если нет доступа не возвращаем 403, а отдаем 404
             return next(
                 new NotFoundError('Заказ по заданному id отсутствует в базе')
             )
@@ -299,7 +289,7 @@ export const getOrderCurrentUserByNumber = async (
     }
 }
 
-// POST /product
+// POST /order
 export const createOrder = async (
     req: Request,
     res: Response,
@@ -324,12 +314,21 @@ export const createOrder = async (
             if (product.price === null) {
                 throw new BadRequestError(`Товар с id ${id} не продается`)
             }
-            return basket.push(product)
+            basket.push(product)
         })
         const totalBasket = basket.reduce((a, c) => a + c.price, 0)
         if (totalBasket !== total) {
             return next(new BadRequestError('Неверная сумма заказа'))
         }
+
+        // Санитизация комментария (защита от XSS)
+        const safeComment =
+            comment && typeof comment === 'string'
+                ? sanitizeHtml(comment, {
+                      allowedTags: [],
+                      allowedAttributes: {},
+                  })
+                : ''
 
         const newOrder = new Order({
             totalAmount: total,
@@ -353,7 +352,7 @@ export const createOrder = async (
     }
 }
 
-// Update an order
+// Update order status (admin only)
 export const updateOrder = async (
     req: Request,
     res: Response,
@@ -385,7 +384,7 @@ export const updateOrder = async (
     }
 }
 
-// Delete an order
+// Delete order (admin only)
 export const deleteOrder = async (
     req: Request,
     res: Response,
