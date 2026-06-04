@@ -95,14 +95,15 @@ export const getCustomers = async (
             }
         }
 
-       if (typeof search === 'string' && search) {
+      if (typeof search === 'string' && search) {
     const safeSearch = escapeRegExp(search);
     const searchRegex = new RegExp(safeSearch, 'i');
-    let orderIds: Types.ObjectId[] = [];
+    let orderIds: any[] = [];
     try {
         const orders = await Order.find({ deliveryAddress: searchRegex }, '_id');
         orderIds = orders.map(order => order._id);
     } catch (err) {
+        // Если ошибка (например, коллекция не существует), просто игнорируем поиск по заказам
     }
     filters.$or = [
         { name: searchRegex },
