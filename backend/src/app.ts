@@ -9,14 +9,19 @@ import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
 import { checkQuery } from './middlewares/checkQuery'
+import rateLimit from 'express-rate-limit'
 
 const { PORT = 3000 } = process.env
 const app = express()
-
+const limiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 50,
+    message: { message: 'Слишком много запросов' },
+})
+app.use(limiter)
 app.use(cookieParser())
 
-app.use(cors())
-// app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }));
+app.use(cors({ origin: process.env.ORIGIN_ALLOW, credentials: true }))
 // app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(serveStatic(path.join(__dirname, 'public')))
