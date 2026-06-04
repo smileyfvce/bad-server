@@ -107,7 +107,7 @@ export const getCustomers = async (
     }
     filters.$or = [
         { name: searchRegex },
-        { lastOrder: { $in: orderIds } },
+        { lastOrder: { $in: orderIds }},
     ];
 }
 
