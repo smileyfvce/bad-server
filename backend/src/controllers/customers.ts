@@ -1,14 +1,11 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
-// import Order from '../models/order'
+import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import { normalizeLimit } from '../utils/normalizeLimit'
 import escapeRegExp from '../utils/escapeRegExp'
 
-// TODO: Добавить guard admin
-// eslint-disable-next-line max-len
-// Get GET /customers?page=2&limit=5&sort=totalAmount&order=desc&registrationDateFrom=2023-01-01&registrationDateTo=2023-12-31&lastOrderDateFrom=2023-01-01&lastOrderDateTo=2023-12-31&totalAmountFrom=100&totalAmountTo=1000&orderCountFrom=1&orderCountTo=10
 export const getCustomers = async (
     req: Request,
     res: Response,
@@ -99,12 +96,18 @@ export const getCustomers = async (
         }
 
         if (typeof search === 'string' && search) {
-    try {
-        const searchRegex = new RegExp(search, 'i');
-        filters.name = searchRegex;
-    } catch (e) {
-    }
-}
+            const safeSearch = escapeRegExp(search)
+            const searchRegex = new RegExp(safeSearch, 'i')
+            const orders = await Order.find(
+                { deliveryAddress: searchRegex },
+                '_id'
+            )
+            const orderIds = orders.map((order) => order._id)
+            filters.$or = [
+                { name: searchRegex },
+                { lastOrder: { $in: orderIds } },
+            ]
+        }
 
         const sort: { [key: string]: 1 | -1 } = {}
         if (sortField && sortOrder) {
