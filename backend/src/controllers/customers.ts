@@ -5,6 +5,15 @@ import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import { normalizeLimit } from '../utils/normalizeLimit'
 import escapeRegExp from '../utils/escapeRegExp'
+import getPagination from 'utils/getPagination'
+import validateQuery from 'utils/validateQuery'
+
+const allowedCustomerSortFields = [
+    'createdAt',
+    'lastOrderDate',
+    'totalAmount',
+    'orderCount',
+];
 
 export const getCustomers = async (
     req: Request,
@@ -12,6 +21,22 @@ export const getCustomers = async (
     next: NextFunction
 ) => {
     try {
+        validateQuery(req.query, [
+            'page',
+            'limit',
+            'sortField',
+            'sortOrder',
+            'registrationDateFrom',
+            'registrationDateTo',
+            'lastOrderDateFrom',
+            'lastOrderDateTo',
+            'totalAmountFrom',
+            'totalAmountTo',
+            'orderCountFrom',
+            'orderCountTo',
+            'search',
+        ]);
+
         const {
             page = 1,
             limit = 10,
@@ -26,101 +51,99 @@ export const getCustomers = async (
             orderCountFrom,
             orderCountTo,
             search,
-        } = req.query
+        } = req.query;
+        const pagination = getPagination(page, limit, 10);
 
-        // Нормализация пагинации
-        const safeLimit = normalizeLimit(limit, 10)
-        const safePage = Math.max(1, Number(page) || 1)
-        const skip = (safePage - 1) * safeLimit
-
-        const filters: FilterQuery<Partial<IUser>> = {}
+        const filters: FilterQuery<Partial<IUser>> = {};
 
         if (registrationDateFrom) {
             filters.createdAt = {
                 ...filters.createdAt,
                 $gte: new Date(registrationDateFrom as string),
-            }
+            };
         }
 
         if (registrationDateTo) {
-            const endOfDay = new Date(registrationDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
+            const endOfDay = new Date(registrationDateTo as string);
+            endOfDay.setHours(23, 59, 59, 999);
             filters.createdAt = {
                 ...filters.createdAt,
                 $lte: endOfDay,
-            }
+            };
         }
 
         if (lastOrderDateFrom) {
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
                 $gte: new Date(lastOrderDateFrom as string),
-            }
+            };
         }
 
         if (lastOrderDateTo) {
-            const endOfDay = new Date(lastOrderDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
+            const endOfDay = new Date(lastOrderDateTo as string);
+            endOfDay.setHours(23, 59, 59, 999);
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
                 $lte: endOfDay,
-            }
+            };
         }
 
         if (totalAmountFrom) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $gte: Number(totalAmountFrom),
-            }
+            };
         }
 
         if (totalAmountTo) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $lte: Number(totalAmountTo),
-            }
+            };
         }
 
         if (orderCountFrom) {
             filters.orderCount = {
                 ...filters.orderCount,
                 $gte: Number(orderCountFrom),
-            }
+            };
         }
 
         if (orderCountTo) {
             filters.orderCount = {
                 ...filters.orderCount,
                 $lte: Number(orderCountTo),
-            }
+            };
         }
 
-      if (typeof search === 'string' && search) {
-    const safeSearch = escapeRegExp(search);
-    const searchRegex = new RegExp(safeSearch, 'i');
-    let orderIds: any[] = [];
-    try {
-        const orders = await Order.find({ deliveryAddress: searchRegex }, '_id');
-        orderIds = orders.map(order => order._id);
-    } catch (err) {
-        // Если ошибка (например, коллекция не существует), просто игнорируем поиск по заказам
-    }
-    filters.$or = [
-        { name: searchRegex },
-        { lastOrder: { $in: orderIds }},
-    ];
-}
-
-        const sort: { [key: string]: 1 | -1 } = {}
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'asc' ? 1 : -1
+        if (typeof search === 'string' && search) {
+            const searchRegex = new RegExp(escapeRegExp(search), 'i');
+            const orders = await Order.find(
+                { deliveryAddress: searchRegex },
+                '_id'
+            );
+            const orderIds = orders.map((order) => order._id);
+            filters.$or = [
+                { name: searchRegex },
+                { lastOrder: { $in: orderIds } },
+            ];
         }
 
-        const users = await User.find(filters, null, {
+        const sort: { [key: string]: any } = {};
+        const safeSortField =
+            typeof sortField === 'string' &&
+            allowedCustomerSortFields.includes(sortField)
+                ? sortField
+                : 'createdAt';
+        sort[safeSortField] = sortOrder === 'asc' ? 1 : -1;
+
+        const options = {
             sort,
-            skip,
-            limit: safeLimit,
-        }).populate([
+            skip: pagination.skip,
+            limit: pagination.limit,
+        };
+
+        const users = await User.find(filters, null, options).populate([
             'orders',
             {
                 path: 'lastOrder',
@@ -130,24 +153,25 @@ export const getCustomers = async (
                 path: 'lastOrder',
                 populate: { path: 'customer' },
             },
-        ])
+        ]);
 
-        const totalUsers = await User.countDocuments(filters)
-        const totalPages = Math.ceil(totalUsers / safeLimit)
+        const totalUsers = await User.countDocuments(filters);
+        const totalPages = Math.ceil(totalUsers / pagination.limit);
 
         res.status(200).json({
             customers: users,
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: safePage,
-                pageSize: safeLimit,
+                currentPage: pagination.page,
+                pageSize: pagination.limit,
             },
-        })
+        });
     } catch (error) {
-        next(error)
+        next(error);
     }
-}
+};
+
 
 // Get /customers/:id
 export const getCustomerById = async (
