@@ -172,7 +172,6 @@ export const getCustomers = async (
     }
 };
 
-
 // Get /customers/:id
 export const getCustomerById = async (
     req: Request,
