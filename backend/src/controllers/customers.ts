@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express'
-import { FilterQuery } from 'mongoose'
+import { FilterQuery, Types } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
@@ -95,19 +95,20 @@ export const getCustomers = async (
             }
         }
 
-        if (typeof search === 'string' && search) {
-            const safeSearch = escapeRegExp(search)
-            const searchRegex = new RegExp(safeSearch, 'i')
-            const orders = await Order.find(
-                { deliveryAddress: searchRegex },
-                '_id'
-            )
-            const orderIds = orders.map((order) => order._id)
-            filters.$or = [
-                { name: searchRegex },
-                { lastOrder: { $in: orderIds } },
-            ]
-        }
+       if (typeof search === 'string' && search) {
+    const safeSearch = escapeRegExp(search);
+    const searchRegex = new RegExp(safeSearch, 'i');
+    let orderIds: Types.ObjectId[] = [];
+    try {
+        const orders = await Order.find({ deliveryAddress: searchRegex }, '_id');
+        orderIds = orders.map(order => order._id);
+    } catch (err) {
+    }
+    filters.$or = [
+        { name: searchRegex },
+        { lastOrder: { $in: orderIds } },
+    ];
+}
 
         const sort: { [key: string]: 1 | -1 } = {}
         if (sortField && sortOrder) {
