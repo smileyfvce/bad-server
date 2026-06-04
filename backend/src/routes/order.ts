@@ -16,7 +16,7 @@ import { Role } from '../models/user'
 const orderRouter = Router()
 const csrfProtection = csrf({ cookie: true });
 
-orderRouter.post('/', auth, csrfProtection, validateOrderBody, createOrder)
+orderRouter.post('/', auth,validateOrderBody, csrfProtection, validateOrderBody, createOrder)
 orderRouter.get('/all', auth, roleGuardMiddleware(Role.Admin), getOrders)
 orderRouter.get('/all/me', auth, getOrdersCurrentUser)
 orderRouter.get(
