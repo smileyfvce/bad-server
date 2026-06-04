@@ -3,17 +3,8 @@ import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
-//import { normalizeLimit } from '../utils/normalizeLimit'
+import BadRequestError from '../errors/bad-request-error'
 import escapeRegExp from '../utils/escapeRegExp'
-import getPagination from '../utils/getPagination'
-import validateQuery from '../utils/validateQuery'
-
-const allowedCustomerSortFields = [
-    'createdAt',
-    'lastOrderDate',
-    'totalAmount',
-    'orderCount',
-];
 
 export const getCustomers = async (
     req: Request,
@@ -51,8 +42,9 @@ export const getCustomers = async (
             orderCountFrom,
             orderCountTo,
             search,
-        } = req.query;
-        const pagination = getPagination(page, limit, 10);
+        } = req.query
+        
+        const safeLimit = Math.min(Number(limit), 10)
 
         const filters: FilterQuery<Partial<IUser>> = {};
 
@@ -116,8 +108,12 @@ export const getCustomers = async (
             };
         }
 
-        if (typeof search === 'string' && search) {
-            const searchRegex = new RegExp(escapeRegExp(search), 'i');
+        if (search && typeof search === 'string') {
+            if (search.length > 200) {
+                return next(new BadRequestError('Слишком длинный запрос'))
+            }
+            const escRegExp = escapeRegExp(search)
+            const searchRegex = new RegExp(escRegExp, 'i')
             const orders = await Order.find(
                 { deliveryAddress: searchRegex },
                 '_id'
@@ -139,9 +135,9 @@ export const getCustomers = async (
 
         const options = {
             sort,
-            skip: pagination.skip,
-            limit: pagination.limit,
-        };
+            skip: (Number(page) - 1) * Number(safeLimit),
+            limit: Number(safeLimit),
+        }
 
         const users = await User.find(filters, null, options).populate([
             'orders',
@@ -163,8 +159,8 @@ export const getCustomers = async (
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: pagination.page,
-                pageSize: pagination.limit,
+                currentPage: Number(page),
+                pageSize: safeLimit,
             },
         });
     } catch (error) {
@@ -196,16 +192,19 @@ export const updateCustomer = async (
     next: NextFunction
 ) => {
     try {
-        const { name, phone } = req.body
-        const updateData: Partial<Pick<IUser, 'name' | 'phone'>> = {}
-
-        if (typeof name === 'string') updateData.name = name
-        if (typeof phone === 'string') updateData.phone = phone
-
+        const updateFields = ['name', 'email']
+        const updates: any = {}
+        updateFields.forEach((key) => {
+            if (req.body[key] !== undefined) {
+                updates[key] = String(req.body[key])
+            }
+        })
         const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
-            { $set: updateData },
-            { new: true, runValidators: true }
+            updates,
+            {
+                new: true,
+            }
         )
             .orFail(
                 () =>

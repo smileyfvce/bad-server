@@ -6,12 +6,21 @@ import NotFoundError from '../errors/not-found-error'
 import Order, { IOrder, StatusType } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
-import { normalizeLimit } from '../utils/normalizeLimit'
 import escapeRegExp from '../utils/escapeRegExp'
-import validateQuery from '../utils/validateQuery'
+import { phoneRegExp } from '../middlewares/validations'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
+
+function escapeHtml(text: string): string {
+    if (!text) return ''
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+}
 
 export const getOrders = async (
     req: Request,
@@ -36,19 +45,14 @@ export const getOrders = async (
             search,
         } = req.query
 
-        // Нормализация пагинации
-        const safeLimit = normalizeLimit(limit, 10)
-        const safePage = Math.max(1, Number(page) || 1)
-        const skip = (safePage - 1) * safeLimit
-
+        const safeLimit = Math.min(Number(limit), 10)
         const filters: FilterQuery<Partial<IOrder>> = {}
 
-        // Безопасная обработка статуса (только строки из enum)
-        if (typeof status === 'string') {
-            const allowedStatuses = Object.values(StatusType)
-            if (allowedStatuses.includes(status as StatusType)) {
-                filters.status = status
+        if (status) {
+            if (typeof status === 'object') {
+                return next(new BadRequestError('Неправильный формат'))
             }
+            filters.status = String(status)
         }
 
         if (totalAmountFrom) {
@@ -101,9 +105,12 @@ export const getOrders = async (
             { $unwind: '$products' },
         ]
 
-        if (typeof search === 'string' && search) {
-            const safeSearch = escapeRegExp(search)
-            const searchRegex = new RegExp(safeSearch, 'i')
+        if (search && typeof search === 'string') {
+            if (search.length > 200) {
+                return next(new BadRequestError('Слишком длинный запрос'))
+            }
+            const escRegExp = escapeRegExp(search)
+            const searchRegex = new RegExp(escRegExp, 'i')
             const searchNumber = Number(search)
 
             const searchConditions: any[] = [{ 'products.title': searchRegex }]
@@ -126,7 +133,7 @@ export const getOrders = async (
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: skip },
+            { $skip: (Number(page) - 1) * safeLimit },
             { $limit: safeLimit },
             {
                 $group: {
@@ -150,7 +157,7 @@ export const getOrders = async (
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: safePage,
+                currentPage: Number(page),
                 pageSize: safeLimit,
             },
         })
@@ -186,9 +193,12 @@ export const getOrdersCurrentUser = async (
 
         let orders = user.orders as unknown as IOrder[]
 
-        if (typeof search === 'string' && search) {
-            const safeSearch = escapeRegExp(search)
-            const searchRegex = new RegExp(safeSearch, 'i')
+        if (search && typeof search === 'string') {
+            if (search.length > 200) {
+                return next(new BadRequestError('Слишком длинный запрос'))
+            }
+            const escRegExp = escapeRegExp(search)
+            const searchRegex = new RegExp(escRegExp, 'i')
             const searchNumber = Number(search)
             const products = await Product.find({ title: searchRegex })
             const productIds = products.map((product) => product._id)
@@ -292,7 +302,10 @@ export const createOrder = async (
         const { address, payment, phone, total, email, items, comment } =
             req.body
 
-        // Валидация элементов корзины
+        if(!phoneRegExp.test(phone)){
+            throw new BadRequestError('Неверный формат телефона')
+        }
+
         items.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
             if (!product) {
@@ -323,7 +336,7 @@ export const createOrder = async (
             payment,
             phone,
             email,
-            comment: safeComment,
+            comment: escapeHtml(comment),
             customer: userId,
             deliveryAddress: address,
         })

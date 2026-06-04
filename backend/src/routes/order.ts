@@ -1,3 +1,4 @@
+import csrf from '@dr.pogodin/csurf'
 import { Router } from 'express'
 import {
     createOrder,
@@ -13,8 +14,9 @@ import { validateOrderBody } from '../middlewares/validations'
 import { Role } from '../models/user'
 
 const orderRouter = Router()
+const csrfProtection = csrf({ cookie: true });
 
-orderRouter.post('/', auth, validateOrderBody, createOrder)
+orderRouter.post('/', auth, csrfProtection, validateOrderBody, createOrder)
 orderRouter.get('/all', auth, roleGuardMiddleware(Role.Admin), getOrders)
 orderRouter.get('/all/me', auth, getOrdersCurrentUser)
 orderRouter.get(
@@ -28,9 +30,10 @@ orderRouter.patch(
     '/:orderNumber',
     auth,
     roleGuardMiddleware(Role.Admin),
+    csrfProtection,
     updateOrder
 )
 
-orderRouter.delete('/:id', auth, roleGuardMiddleware(Role.Admin), deleteOrder)
+orderRouter.delete('/:id', auth, roleGuardMiddleware(Role.Admin),csrfProtection, deleteOrder)
 
 export default orderRouter
