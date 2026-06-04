@@ -97,24 +97,16 @@ export const getCustomers = async (
             }
         }
 
-        if (typeof search === 'string' && search) {
-            let searchRegex: RegExp
-            try {
-                searchRegex = new RegExp(search, 'i')
-            } catch {
-                const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                searchRegex = new RegExp(escaped, 'i')
-            }
-            const orders = await Order.find(
-                { deliveryAddress: searchRegex },
-                '_id'
-            )
-            const orderIds = orders.map((order) => order._id)
-            filters.$or = [
-                { name: searchRegex },
-                { lastOrder: { $in: orderIds } },
-            ]
-        }
+       if (typeof search === 'string' && search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchCondition = { $regex: escaped, $options: 'i' };
+    const orders = await Order.find({ deliveryAddress: searchCondition }, '_id');
+    const orderIds = orders.map(order => order._id);
+    filters.$or = [
+        { name: searchCondition },
+        { lastOrder: { $in: orderIds } },
+    ];
+}
 
         const sort: { [key: string]: 1 | -1 } = {}
         if (sortField && sortOrder) {
