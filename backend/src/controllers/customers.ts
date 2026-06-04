@@ -1,12 +1,12 @@
 import { NextFunction, Request, Response } from 'express'
-import { FilterQuery, Types } from 'mongoose'
+import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
-import { normalizeLimit } from '../utils/normalizeLimit'
+//import { normalizeLimit } from '../utils/normalizeLimit'
 import escapeRegExp from '../utils/escapeRegExp'
-import getPagination from 'utils/getPagination'
-import validateQuery from 'utils/validateQuery'
+import getPagination from '../utils/getPagination'
+import validateQuery from '../utils/validateQuery'
 
 const allowedCustomerSortFields = [
     'createdAt',
