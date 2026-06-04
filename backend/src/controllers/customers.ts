@@ -4,6 +4,7 @@ import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import { normalizeLimit } from '../utils/normalizeLimit'
+import escapeRegExp from '../utils/escapeRegExp'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -98,7 +99,8 @@ export const getCustomers = async (
         }
 
         if (typeof search === 'string' && search) {
-            const searchRegex = new RegExp(search, 'i')
+            const safeSearch = escapeRegExp(search)
+            const searchRegex = new RegExp(safeSearch, 'i')
             const orders = await Order.find(
                 { deliveryAddress: searchRegex },
                 '_id'
