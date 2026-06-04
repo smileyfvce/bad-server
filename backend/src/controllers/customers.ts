@@ -99,9 +99,12 @@ export const getCustomers = async (
         }
 
         if (typeof search === 'string' && search) {
-            const safeSearch = escapeRegExp(search)
-            filters.name = { $regex: safeSearch, $options: 'i' }
-        }
+    try {
+        const searchRegex = new RegExp(search, 'i');
+        filters.name = searchRegex;
+    } catch (e) {
+    }
+}
 
         const sort: { [key: string]: 1 | -1 } = {}
         if (sortField && sortOrder) {
