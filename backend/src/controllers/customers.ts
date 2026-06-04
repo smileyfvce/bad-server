@@ -4,6 +4,7 @@ import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import { normalizeLimit } from '../utils/normalizeLimit'
+import escapeRegExp from '../utils/escapeRegExp'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -98,12 +99,12 @@ export const getCustomers = async (
         }
 
        if (typeof search === 'string' && search) {
-    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const searchCondition = { $regex: escaped, $options: 'i' };
-    const orders = await Order.find({ deliveryAddress: searchCondition }, '_id');
+    const safeSearch = escapeRegExp(search);
+    const searchRegex = new RegExp(safeSearch, 'i');
+    const orders = await Order.find({ deliveryAddress: searchRegex }, '_id');
     const orderIds = orders.map(order => order._id);
     filters.$or = [
-        { name: searchCondition },
+        { name: searchRegex },
         { lastOrder: { $in: orderIds } },
     ];
 }
