@@ -28,7 +28,7 @@ app.use(serveStatic(path.join(__dirname, 'public')))
 
 app.use(urlencoded({ extended: true }))
 app.use(json())
-app.use(checkQuery)
+// app.use(checkQuery)
 
 app.options('*', cors())
 app.use(routes)
